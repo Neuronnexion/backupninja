@@ -53,6 +53,10 @@ compress    = yes
 # which databases to backup. should either be the word 'all' or a 
 # space separated list of database names.
 #
+# ignoredbs = < db1 db2 d3 > (no default)
+# which databases to skip when backing up (applies to sqldump
+# and hotcopy).
+#
 # nodata = < db.table1 db.table2 db.table3 > (no default)
 # only dump the structure for the database tables listed here, this means
 # no data contained in these tables will be dumped. This is very useful
