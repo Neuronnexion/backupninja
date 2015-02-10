@@ -22,7 +22,9 @@ getconf dbusername
 getconf dbpassword
 getconf configfile /etc/mysql/debian.cnf
 
-info "The following dbs will not be backed up : $ignoredbs"
+if [ "$ignoredbs" != "" ] ; then
+   info "The following dbs will not be backed up : $ignoredbs"
+fi
 
 # $1 is the value we search for, $2+ are the possible values
 # return 0 when found, 1 when not found
