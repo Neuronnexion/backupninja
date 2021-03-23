@@ -186,7 +186,7 @@ function tolower() {
 
 # simple to integer function
 function toint() {
-   echo "$1" | tr -d '[:alpha:]'
+   echo "$1" | @SED@ 's/[^0-9]//g;s/^0\+//'
 }
 
 #
@@ -202,7 +202,7 @@ function toint() {
 # we grab the current time once, since processing
 # all the configs might take more than an hour.
 nowtime=`LC_ALL=C date +%H`
-nowday=`LC_ALL=C date +%d`
+nowday=`LC_ALL=C date +%-d`
 nowdayofweek=`LC_ALL=C date +%A`
 nowdayofweek=`tolower "$nowdayofweek"`
 
@@ -215,25 +215,56 @@ function isnow() {
    whendayofweek=$1; at=$2; whentime=$3;
    whenday=`toint "$whendayofweek"`
    whendayofweek=`tolower "$whendayofweek"`
+   whentimeoriginal=$whentime
    whentime=`echo "$whentime" | @SED@ 's/:[0-9][0-9]$//' | @SED@ -r 's/^([0-9])$/0\1/'`
 
    if [ "$whendayofweek" == "everyday" -o "$whendayofweek" == "daily" ]; then
-      whendayofweek=$nowdayofweek
+       whendayofweek=$nowdayofweek
    fi
 
    if [ "$whenday" == "" ]; then
-      if [ "$whendayofweek" != "$nowdayofweek" ]; then
-         whendayofweek=${whendayofweek%s}
-         if [ "$whendayofweek" != "$nowdayofweek" ]; then
-            return 0
-         fi
-      fi
+       if [ "$whendayofweek" != "$nowdayofweek" ]; then
+           whendayofweek=${whendayofweek%s}
+           if [ "$whendayofweek" != "$nowdayofweek" ]; then
+               if [ "$whendayofweek" != "monday" -a "$whendayofweek" != "tuesday" -a "$whendayofweek" != "wednesday" -a "$whendayofweek" != "thursday" -a "$whendayofweek" != "friday" -a "$whendayofweek" != "saturday" -a "$whendayofweek" != "sunday" ]; then
+                   warning "The day in the 'when' option in the configuration is malformed. Please read the README for examples."
+               fi
+               if [ "$at" != "at" ]; then
+                   warning "The 'when' option in the configuration doesn't contain an 'at'. Please read the README for examples."
+               fi
+               if [[ "$whentimeoriginal" != @([0-9][0-9])?(:[0-9][0-9]) ]]; then
+                   warning "The time in the 'when' option in the configuration is malformed or does not exist. Please read the README for examples."
+               fi
+               return 0
+           fi
+       fi
    elif [ "$whenday" != "$nowday" ]; then
-      return 0
+       if [ "$whenday" -lt 1 -o "$whenday" -gt 31 ]; then
+           warning "The numeric value of the day in the 'when' option in the configuration does not match a day. Please read the README for examples."
+       fi
+       if [ -z "$whentime" ]; then
+           warning "The 'when' variable in the configuration file is malformed. You either didn't specify the day or the time. Please read the README for eamples."
+       fi
+       if [ "$at" != "at" ]; then
+           warning "The 'when' option in the configuration doesn't contain an 'at'. Please read the README for examples."
+       fi
+       return 0
+   elif [ -z "$whentime" ]; then
+       warning "The 'when' variable in the configuration file is malformed. You either didn't specify the day or the time. Please read the README for examples."
+       return 0
    fi
 
-   [ "$at" == "at" ] || return 0
-   [ "$whentime" == "$nowtime" ] || return 0
+   if [ "$at" != "at" ]; then
+       warning "The 'when' option in the configuration doesn't contain an 'at'. Please read the README for examples."
+       return 0
+   fi
+
+   if [[ "$whentimeoriginal" != @([0-9][0-9])?(:[0-9][0-9]) ]]; then
+       warning "The time in the 'when' option in the configuration is malformed. Please read the README for examples."
+       return 0
+   elif [ "$whentime" != "$nowtime" ]; then
+       return 0
+   fi
 
    return 1
 }
@@ -247,6 +278,7 @@ script is run hourly from cron.
 
 The following options are available:
 -h, --help           This usage message
+-V, --version        Show backupninja version number
 -d, --debug          Run in debug mode, where all log messages are
                      output to the current shell.
 -f, --conffile FILE  Use FILE for the main configuration instead
@@ -343,9 +375,9 @@ function process_action() {
                [ $debug ] && colorize "$a"
             done
          )
-         retcode=$?
-         # ^^^^^^^^ we have a problem! we can't grab the return code "$?". grrr.
+         retcode=${PIPESTATUS[0]}
          echo_debug_msg=0
+         debug "handler returned exit code $retcode"
 
       else
          # a backup is probably ongoing already, so display an error message
@@ -400,12 +432,14 @@ function process_action() {
 setupcolors
 conffile="@CFGDIR@/backupninja.conf"
 loglevel=3
+version="@PACKAGE_VERSION@"
 
 ## process command line options
 
 while [ $# -ge 1 ]; do
    case $1 in
       -h|--help) usage;;
+      -V|--version) echo "backupninja $version";;
       -d|--debug) debug=1; export BACKUPNINJA_DEBUG=yes;;
       -t|--test) test=1;debug=1;;
       -n|--now) processnow=1;;
@@ -434,10 +468,9 @@ while [ $# -ge 1 ]; do
          ;;
       *)
          debug=1
-         echo "Unknown option $1"
-         fatal "Unknown option $1"
+         error "Unknown option $1"
          usage
-         exit
+         exit 3
          ;;
    esac
    shift
@@ -473,7 +506,6 @@ fi
 
 # include shared functions
 . $libdirectory/tools
-. $libdirectory/vserver
 
 setfile $conffile
 
@@ -511,10 +543,7 @@ getconf RSYNC /usr/bin/rsync
 getconf DSYNC /usr/bin/dsync
 getconf DOVEADM /usr/bin/doveadm
 getconf admingroup root
-
-# initialize vservers support
-# (get config variables and check real vservers availability)
-init_vservers nodialog
+getconf reportwrap 1000
 
 if [ ! -d "$configdirectory" ]; then
    echo "Configuration directory '$configdirectory' not found."
@@ -525,7 +554,7 @@ fi
 
 if [ "$UID" != "0" ]; then
    echo "`basename $0` can only be run as root"
-   exit 1
+   exit 3
 fi
 
 ## Process each configuration file
@@ -557,9 +586,9 @@ for file in $files; do
 
    check_perms ${file%/*} # check containing dir
    check_perms $file
-   suffix="${file##*.}"
    base=`basename $file`
-   if [ "${base:0:1}" == "0" -o "$suffix" == "disabled" ]; then
+   suffix="${base##*.}"
+   if [ "${base:0:1}" == "0" -o "$suffix" == "disabled" -o "$suffix" == "$base" ]; then
       info "Skipping $file"
       continue
    fi
@@ -578,34 +607,41 @@ if [ $actions_run == 0 ]; then doit=0
 elif [ "$reportemail" == "" ]; then doit=0
 elif [ $fatals != 0 ]; then doit=1
 elif [ $errors != 0 ]; then doit=1
+elif [ $halts != 0 ]; then doit=1
 elif [ "$reportsuccess" == "yes" ]; then doit=1
 elif [ "$reportwarning" == "yes" -a $warnings != 0 ]; then doit=1
 else doit=0
 fi
 
 if [ $doit == 1 ]; then
-   debug "send report to $reportemail"
-   hostname=`hostname`
-   [ $warnings == 0 ] || subject="WARNING"
-   [ $errors == 0 ] || subject="ERROR"
-   [ $fatals == 0 ] || subject="FAILED"
+   if [ -x "$(which mail 2>/dev/null)" ]; then
+      debug "send report to $reportemail"
+      hostname=`hostname`
+      [ $warnings == 0 ] || subject="WARNING"
+      [ $errors == 0 ] || subject="ERROR"
+      [ $fatals == 0 ] || subject="FAILED"
+      [ $halts == 0 ] || subject="HALTED"
 
-   {
-      for ((i=0; i < ${#messages[@]} ; i++)); do
-         echo ${messages[$i]}
-      done
-      echo -e "$errormsg"
-      if [ "$reportspace" == "yes" ]; then
-         previous=""
-         for i in $(ls "$configdirectory"); do
-            backuploc=$(grep ^directory "$configdirectory"/"$i" | @AWK@ '{print $3}')
-            if [ "$backuploc" != "$previous" -a -n "$backuploc" -a -d "$backuploc" ]; then
-               df -h "$backuploc"
-               previous="$backuploc"
-            fi
+      {
+         for ((i=0; i < ${#messages[@]} ; i++)); do
+            echo ${messages[$i]}
          done
-      fi
-   } | mail -s "backupninja: $hostname $subject" $reportemail
+         echo -e "$errormsg"
+         if [ "$reportspace" == "yes" ]; then
+            previous=""
+            for i in $(ls "$configdirectory"); do
+               backuploc=$(grep ^directory "$configdirectory"/"$i" | @AWK@ '{print $3}')
+               if [ "$backuploc" != "$previous" -a -n "$backuploc" -a -d "$backuploc" ]; then
+                  df -h "$backuploc"
+                  previous="$backuploc"
+               fi
+            done
+         fi
+      } | fold -s -w "$reportwrap" | mail -s "backupninja: $hostname $subject" $reportemail
+   else
+      error "Unable to locate mail executable, email report not sent!"
+      let "errors += 1"
+   fi
 fi
 
 if [ $actions_run != 0 ]; then
@@ -616,6 +652,33 @@ if [ $actions_run != 0 ]; then
 fi
 
 if [ -n "$reporthost" ]; then
-   debug "send $logfile to $reportuser@$reporthost:$reportdirectory"
-   rsync -qt $logfile $reportuser@$reporthost:$reportdirectory
+   if [ -z "$reportuser" ] || [ -z "$reportdirectory" ]; then
+      error "Unable to send report, reportuser and reportdirectory must be specified."
+      let "errors += 1"
+   elif [ ! -x "$(which rsync 2>/dev/null)" ]; then
+      error "Unable to locate rsync executable, report could not be sent to ${reporthost}."
+      let "errors += 1"
+   else
+      info "Sending $logfile to $reportuser@$reporthost:$reportdirectory"
+      execstr="rsync -qt $logfile $reportuser@$reporthost:$reportdirectory"
+      debug $execstr
+      output=$(eval $execstr 2>&1)
+      ret=$?
+      if [ $ret -ne 0 ]; then
+         error $output
+         error "An error was encountered attempting to send report to ${reporthost}."
+         let "errors += 1"
+      fi
+   fi
 fi
+
+# unset exported envvars
+unset BACKUPNINJA_DEBUG
+
+# return exit code
+[ $halts == 0 ] || exit 2
+[ $fatals == 0 ] || exit 2
+[ $errors == 0 ] || exit 1
+[ "$reportwarning" == "yes" -a $warnings != 0 ] && exit 1
+
+exit 0

@@ -40,6 +40,7 @@
 #   keepweekly = for long storage format, specify the number of weekly backup increments
 #   keepmonthly = for long storage format, specify the number of monthly backup increments
 #   nicelevel = rsync command nice level
+#   ionicelevel = best-effort nice level applied to rsync and other commands
 #   enable_mv_timestamp_bug = set to "yes" if your system isnt handling timestamps correctly
 #   tmp = temp folder
 #   multiconnection = set to "yes" if you want to use multiconnection ssh support
@@ -56,7 +57,6 @@
 #   protocol = ssh or rsync (remote source only)
 #   rsync = rsync program
 #   rsync_options = rsync command options
-#   exclude_vserver = vserver-name (valid only if vservers = yes on backupninja.conf)
 #   numericids = when set to 1, use numeric ids instead of user/group mappings on rsync
 #   compress = if set to 1, compress data on rsync (remote source only)
 #   bandwidthlimit = set a bandwidth limit in KB/s (remote source only)
@@ -97,25 +97,22 @@
 #   mv = mv command
 #   fsck = fsck command
 #
-# You dont need to manually specify vservers using "include = /vservers".
-# They are automatically backuped if vserver is set to "yes" on you backupninja.conf.
-#
 
 # function definitions
 
 function eval_config {
-  
+
   # system section
-  
+
   setsection system
   getconf rm rm
   getconf cp cp
   getconf touch touch
   getconf mv mv
   getconf fsck fsck
-  
+
   # general section
-  
+
   setsection general
   getconf log /var/log/backup/rsync.log
   getconf partition
@@ -129,21 +126,21 @@ function eval_config {
   getconf keepweekly 3
   getconf keepmonthly 1
   getconf nicelevel 0
+  getconf ionicelevel
   getconf enable_mv_timestamp_bug no
   getconf tmp /tmp
   getconf multiconnection no
-  
+
   # source section
-  
+
   setsection source
   getconf from local
   getconf rsync $RSYNC
   getconf rsync_options "-av --delete --recursive"
-  
+
   if [ "$from" == "remote" ]; then
     getconf testconnect no
     getconf protocol ssh
-    getconf ssh ssh
     getconf host
 
     if [ "$protocol" == "ssh" ]; then
@@ -157,9 +154,9 @@ function eval_config {
     getconf user
     getconf bandwidthlimit
     getconf remote_rsync rsync
-    getconf id_file /root/.ssh/id_dsa
+    getconf id_file /root/.ssh/id_rsa
   fi
-  
+
   getconf batch no
 
   if [ "$batch" == "yes" ]; then
@@ -173,20 +170,18 @@ function eval_config {
   getconf filelistbase
   getconf include
   getconf exclude
-  getconf exclude_vserver
   getconf numericids 0
   getconf compress 0
-  
+
   # dest section
-  
+
   setsection dest
   getconf dest local
   getconf fakesuper no
-  
+
   if [ "$dest" == "remote" ]; then
     getconf testconnect no
     getconf protocol ssh
-    getconf ssh ssh
     getconf host
 
     if [ "$protocol" == "ssh" ]; then
@@ -200,9 +195,9 @@ function eval_config {
     getconf user
     getconf bandwidthlimit
     getconf remote_rsync rsync
-    getconf id_file /root/.ssh/id_dsa
+    getconf id_file /root/.ssh/id_rsa
   fi
-  
+
   getconf batch no
 
   if [ "$batch" != "yes" ]; then
@@ -217,9 +212,9 @@ function eval_config {
 
   getconf numericids 0
   getconf compress 0
-  
+
   # services section
-  
+
   setsection services
   getconf initscripts /etc/init.d
   getconf service
@@ -236,7 +231,7 @@ function eval_config {
 
   backupdir="$mountpoint/$backupdir"
 
-  if [ "$dest" == "local" ] && [ ! -d "$backupdir" ]; then 
+  if [ "$dest" == "local" ] && [ ! -d "$backupdir" ]; then
     fatal "Backupdir $backupdir does not exist"
   fi
 
@@ -252,10 +247,14 @@ function eval_config {
     fi
   fi
 
-  if [ ! -z "$nicelevel" ]; then 
+  if [ ! -z "$nicelevel" ]; then
     nice="nice -n $nicelevel"
-  else 
+  else
     nice=""
+  fi
+
+  if [ -n "$ionicelevel" ]; then
+    nice="ionice -c2 -n $ionicelevel $nice"
   fi
 
   ssh_cmd_base="ssh -T -o PasswordAuthentication=no -p $port -i $id_file"
@@ -378,6 +377,11 @@ function rotate_short_remote {
       rm -rf $metadata/\$file
     fi
   done
+
+  # Create first directory if needed
+  if [ -d $backupdir ]; then
+    [ -d $folder.0 ] || mkdir -p $folder.0
+  fi
   ##### END REMOTE SCRIPT #######
 EOF
 ) | (while read a; do passthru $a; done)
@@ -415,7 +419,7 @@ function rotate_long {
       warning "Warning: metadata does not exist for $dir.1. This backup may be only partially completed. Skipping rotation."
       continue 1
     fi
-    
+
     # Rotate the current list of backups, if we can.
     oldest=`find $backuproot -maxdepth 1 -type d -name $rottype'.*' | @SED@ -e 's/^.*\.//' | sort -n | tail -1`
     [ "$oldest" == "" ] && oldest=0
@@ -484,7 +488,7 @@ function rotate_long {
     max=$((keep${rottype}+1))
     dir="$backuproot/$rottype"
     oldest=`find $backuproot -maxdepth 1 -type d -name $rottype'.*' | @SED@ -e 's/^.*\.//' | sort -n | tail -1`
-    [ "$oldest" == "" ] && oldest=0 
+    [ "$oldest" == "" ] && oldest=0
     # if we've rotated the last backup off the stack, remove it.
     for (( i=$oldest; i >= $max; i-- )); do
       if [ -d $dir.$i ]; then
@@ -542,7 +546,7 @@ function rotate_long_remote {
       echo "Warning: metadata does not exist for \$dir.1. This backup may be only partially completed. Skipping rotation."
       continue 1
     fi
-    
+
     # Rotate the current list of backups, if we can.
     oldest=\`find $backuproot -maxdepth 1 -type d -name \$rottype'.*' | @SED@ -e 's/^.*\.//' | sort -n | tail -1\`
     [ "\$oldest" == "" ] && oldest=0
@@ -611,7 +615,7 @@ function rotate_long_remote {
     max=\$((keep\${rottype}+1))
     dir="$backuproot/\$rottype"
     oldest=\`find $backuproot -maxdepth 1 -type d -name \$rottype'.*' | @SED@ -e 's/^.*\.//' | sort -n | tail -1\`
-    [ "\$oldest" == "" ] && oldest=0 
+    [ "\$oldest" == "" ] && oldest=0
     # if we've rotated the last backup off the stack, remove it.
     for (( i=\$oldest; i >= \$max; i-- )); do
       if [ -d \$dir.\$i ]; then
@@ -795,7 +799,34 @@ function prepare_storage {
     fi
 
   elif [ "$format" == "mirror" ]; then
-    suffix=""
+
+     # create $SECTION directories, but not $backupdir
+     if [ "$dest" == "local" ]; then
+        if [ -d "$backupdir" ]; then
+           mkdir --parents $backupdir/$SECTION
+        else
+           fatal "The destination $backupdir does not exist"
+           exit 1
+        fi
+     else
+        debug "$ssh_cmd"
+        debug "$backupdir/$SECTION"
+(
+        $ssh_cmd <<EOF
+           ##### BEGIN REMOTE SCRIPT #####
+           if [ -d "$backupdir" ]; then
+              mkdir --parents $backupdir/$SECTION
+           else
+              echo "FATAL: The destination $backupdir does not exist"
+           exit 1
+           fi
+           ##### END REMOTE SCRIPT #######
+EOF
+) | (while read a; do passthru $a; done)
+     fi
+
+     suffix=""
+
   else
     fatal "Invalid backup format $format"
   fi
@@ -816,7 +847,7 @@ function set_orig {
 
 }
 
-function set_dest { 
+function set_dest {
 
   if [ "$dest" == "local" ]; then
     dest_path="$backupdir/$SECTION/$suffix/"
@@ -901,7 +932,7 @@ function test_connect {
   if [ "$result" != "1" ]; then
     fatal "Can't connect to $host as $user."
   else
-    debug "Connected to $host successfully"
+    debug "Connected to $host successfully."
   fi
 
 }
@@ -950,14 +981,14 @@ function set_rsync_options {
     if [ ! -z "$bandwidthlimit" ]; then
       rsync_options="$rsync_options --bwlimit=$bandwidthlimit"
     fi
-    
+
     if [ "$fakesuper" == "yes" ]; then
       remote_rsync="$remote_rsync --fake-super"
     fi
 
     if [ "$protocol" == "ssh" ]; then
       if [ ! -e "$id_file" ]; then
-        fatal "SSH Identity file $id_file not found"
+        fatal "SSH identity file $id_file not found."
       else
         debug RSYNC_RSH=\"$ssh_cmd_base\"
         echo RSYNC_RSH=\"$ssh_cmd_base\" >> $log
@@ -974,8 +1005,6 @@ function set_rsync_options {
   else
     rsync_options=($rsync_options --rsync-path="$remote_rsync")
   fi
-
-  include_vservers
 
 }
 
@@ -1050,33 +1079,6 @@ function run_fsck {
 
 }
 
-function include_vservers {
-
-  # add vservers to included folders
-
-  if [ "$vservers_are_available" == "yes" ]; then
-
-    # sane permission on backup
-    mkdir -p $backupdir/$VROOTDIR
-    chmod 000 $backupdir/$VROOTDIR
-
-    for candidate in $found_vservers; do
-      candidate="`basename $candidate`"
-      found_excluded_vserver="0"
-      for excluded_vserver in $exclude_vserver; do
-        if [ "$excluded_vserver" == "$candidate" ]; then
-          found_excluded_vserver="1"
-          break
-        fi
-      done
-      if [ "$found_excluded_vserver" == "0" ]; then
-        include="$include $VROOTDIR/$candidate"
-      fi
-    done
-  fi
-
-}
-
 function start_mux {
 
   if [ "$multiconnection" == "yes" ]; then
@@ -1126,6 +1128,7 @@ function check_rsync_exit_status {
 
   case $1 in
     0)
+       debug "Rsync transfer of $SECTION finished successfully."
        return
        ;;
     1|2|3|4|5|6|10|11|12|13|14|21)
@@ -1174,5 +1177,5 @@ run_fsck
 start_services
 end_mux
 
-echo "Finnishing backup at `date`" >> $log
+echo "Finished backup at `date`" >> $log
 

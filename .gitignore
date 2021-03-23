@@ -20,6 +20,8 @@ etc/cron.d/backupninja
 etc/logrotate.d/backupninja
 examples/Makefile
 handlers/Makefile
+handlers/borg
+handlers/borg.helper
 handlers/dup
 handlers/dup.helper
 handlers/ldap
@@ -33,6 +35,8 @@ handlers/pgsql
 handlers/pgsql.helper
 handlers/rdiff
 handlers/rdiff.helper
+handlers/restic
+handlers/restic.helper
 handlers/rsync
 handlers/sh
 handlers/svn
@@ -45,8 +49,10 @@ lib/Makefile
 lib/easydialog
 lib/parseini
 lib/tools
-lib/vserver
 man/Makefile
 src/Makefile
 src/backupninja
 src/ninjahelper
+.vagrant
+*.swp
+*.swo

@@ -1,9 +1,9 @@
 my_execbindir = $(pkglibdir)
-my_execbin_SCRIPTS = easydialog parseini tools vserver
+my_execbin_SCRIPTS = easydialog parseini tools
 
 CLEANFILES = $(my_execbin_SCRIPTS)
 
-EXTRA_DIST = easydialog.in parseini.in tools.in vserver.in
+EXTRA_DIST = easydialog.in parseini.in tools.in
 
 edit = sed \
     -e "s,@CFGDIR\@,$(CFGDIR),g" \
@@ -11,7 +11,7 @@ edit = sed \
     -e "s,@AWK\@,$(AWK),g" \
     -e "s,@SED\@,$(SED),g" \
     -e "s,@MKTEMP\@,$(MKTEMP),g" \
-    -e "s,@libdir\@,$(pkglibdir),g" 
+    -e "s,@libdir\@,$(pkglibdir),g"
 
 easydialog: $(srcdir)/easydialog.in
 	rm -f easydialog
@@ -24,7 +24,3 @@ parseini: $(srcdir)/parseini.in
 tools: $(srcdir)/tools.in
 	rm -f tools
 	$(edit) tools.in > tools
-
-vserver: $(srcdir)/vserver.in
-	rm -f vserver
-	$(edit) vserver.in > vserver
