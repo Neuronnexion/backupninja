@@ -28,7 +28,6 @@ cache_directory =
 [dest]
 user =
 host = localhost
-port = 22
 directory = ${BN_BACKUPDIR}/testborg
 archive =
 compression = lz4
@@ -243,8 +242,8 @@ finish_borg() {
     setconfig dest user "$BN_REMOTEUSER"
     setconfig dest host "$BN_REMOTEHOST"
     testaction
-    greplog "Debug: ssh\s\+-o PasswordAuthentication=no ${BN_REMOTEHOST} -p 22 -l ${BN_REMOTEUSER} 'echo -n 1'"
-    greplog 'Debug: executing borg create$' "\bssh://${BN_REMOTEUSER}@${BN_REMOTEHOST}:22${BN_BACKUPDIR}/testborg::"
+    greplog "Debug: ssh\s\+-o PasswordAuthentication=no ${BN_REMOTEHOST} -l ${BN_REMOTEUSER} 'echo -n 1'"
+    greplog 'Debug: executing borg create$' "\bssh://${BN_REMOTEUSER}@${BN_REMOTEHOST}${BN_BACKUPDIR}/testborg::"
 }
 
 @test "check config parameter dest/host" {
@@ -258,18 +257,18 @@ finish_borg() {
     setconfig dest user "$BN_REMOTEUSER"
     setconfig dest host "$BN_REMOTEHOST"
     testaction
-    greplog "Debug: ssh\s\+-o PasswordAuthentication=no ${BN_REMOTEHOST} -p 22 -l ${BN_REMOTEUSER} 'echo -n 1'"
-    greplog 'Debug: executing borg create$' "\bssh://${BN_REMOTEUSER}@${BN_REMOTEHOST}:22${BN_BACKUPDIR}/testborg::"
+    greplog "Debug: ssh\s\+-o PasswordAuthentication=no ${BN_REMOTEHOST} -l ${BN_REMOTEUSER} 'echo -n 1'"
+    greplog 'Debug: executing borg create$' "\bssh://${BN_REMOTEUSER}@${BN_REMOTEHOST}${BN_BACKUPDIR}/testborg::"
 }
 
 @test "check config parameter dest/port" {
-    # absent parameter, defaults to 22
+    # absent parameter, port not specified
     setconfig dest user "$BN_REMOTEUSER"
     setconfig dest host "$BN_REMOTEHOST"
     delconfig dest port
     testaction
-    greplog "Debug: ssh\s\+ -o PasswordAuthentication=no ${BN_REMOTEHOST} -p 22 -l ${BN_REMOTEUSER} 'echo -n 1'"
-    greplog 'Debug: executing borg create$' "\bssh://${BN_REMOTEUSER}@${BN_REMOTEHOST}:22${BN_BACKUPDIR}/testborg::"
+    greplog "Debug: ssh\s\+-o PasswordAuthentication=no ${BN_REMOTEHOST} -l ${BN_REMOTEUSER} 'echo -n 1'"
+    greplog 'Debug: executing borg create$' "\bssh://${BN_REMOTEUSER}@${BN_REMOTEHOST}${BN_BACKUPDIR}/testborg::"
 
     # defined parameter
     setconfig dest port 7722
@@ -385,8 +384,8 @@ finish_borg() {
 
 @test "verify remote backup with encryption" {
     export BORG_PASSPHRASE="123foo"
-    run borg extract --dry-run "ssh://${BN_REMOTEUSER}@${BN_REMOTEHOST}:22${BN_BACKUPDIR}/testborg::testarchive"
+    run borg extract --dry-run "ssh://${BN_REMOTEUSER}@${BN_REMOTEHOST}${BN_BACKUPDIR}/testborg::testarchive"
     [ "$status" -eq 2 ]
     export BORG_PASSPHRASE="123test"
-    borg extract --dry-run "ssh://${BN_REMOTEUSER}@${BN_REMOTEHOST}:22${BN_BACKUPDIR}/testborg::testarchive"
+    borg extract --dry-run "ssh://${BN_REMOTEUSER}@${BN_REMOTEHOST}${BN_BACKUPDIR}/testborg::testarchive"
 }
