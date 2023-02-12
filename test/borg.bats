@@ -219,15 +219,15 @@ finish_borg() {
 }
 
 @test "check config parameter source/ignore_missing" {
+    delconfig source include
+    setconfig_repeat source include "$BN_SRCDIR/boot" "$BN_SRCDIR/etc" "$BN_SRCDIR/lib" "$BN_SRCDIR/var" "$BN_SRCDIR/foo"
     setconfig source ignore_missing yes
     setconfig dest archive testarchive
     setconfig dest encryption none
     setconfig dest compression zstd,16
     delconfig dest passphrase
     cleanup_backups local
-    ( sleep 1; mv /var/cache/bntest/lib /tmp ) &
     runaction
-    mv /tmp/lib /var/cache/bntest
     greplog "Info: Backing up source finished with missing file warnings."
 }
 
