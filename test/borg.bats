@@ -1,7 +1,7 @@
 load common
 
 begin_borg() {
-    apt-get -qq install debootstrap borgbackup
+    install_pkgs debootstrap borgbackup
     if [ ! -d "$BN_SRCDIR" ]; then
         debootstrap --variant=minbase testing "$BN_SRCDIR"
     fi

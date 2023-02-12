@@ -1,7 +1,7 @@
 load common
 
 begin_rdiff() {
-    apt-get -qq install debootstrap rdiff-backup cstream
+    install_pkgs install debootstrap rdiff-backup cstream
     if [ ! -d /var/cache/bntest ]; then
         debootstrap --variant=minbase testing /var/cache/bntest
     fi

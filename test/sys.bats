@@ -1,7 +1,7 @@
 load common
 
 begin_sys() {
-    apt-get -qq install debconf-utils hwinfo lvm2 cryptsetup-bin parted
+    install_pkgs debconf-utils hwinfo lvm2 cryptsetup-bin parted
 
     cat << EOF > "${BATS_TMPDIR}/backup.d/test.sys"
 when = manual
