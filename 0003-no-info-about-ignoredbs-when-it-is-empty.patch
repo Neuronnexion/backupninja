@@ -1,0 +1,27 @@
+From 59737453ff1fca389d63113996cffe5d060c1433 Mon Sep 17 00:00:00 2001
+From: Dominique Rousseau <d.rousseau@nnx.com>
+Date: Tue, 10 Feb 2015 17:29:44 +0100
+Subject: [PATCH 3/3] no info about ignoredbs when it is empty
+
+---
+ handlers/mysql.in | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/handlers/mysql.in b/handlers/mysql.in
+index 19e9e2e..d76e446 100644
+--- a/handlers/mysql.in
++++ b/handlers/mysql.in
+@@ -22,7 +22,9 @@ getconf dbusername
+ getconf dbpassword
+ getconf configfile /etc/mysql/debian.cnf
+ 
+-info "The following dbs will not be backed up : $ignoredbs"
++if [ "$ignoredbs" != "" ] ; then
++   info "The following dbs will not be backed up : $ignoredbs"
++fi
+ 
+ # $1 is the value we search for, $2+ are the possible values
+ # return 0 when found, 1 when not found
+-- 
+2.0.1
+

@@ -1,0 +1,27 @@
+From c73a8c28a883c786c83ed05ef1e4a89af7e65ed9 Mon Sep 17 00:00:00 2001
+From: Dominique Rousseau <d.rousseau@nnx.com>
+Date: Tue, 10 Feb 2015 17:28:56 +0100
+Subject: [PATCH 2/3] document in examples the irgnoredbs option
+
+---
+ examples/example.mysql | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/examples/example.mysql b/examples/example.mysql
+index de9651f..9eaab97 100644
+--- a/examples/example.mysql
++++ b/examples/example.mysql
+@@ -53,6 +53,10 @@ compress    = yes
+ # which databases to backup. should either be the word 'all' or a 
+ # space separated list of database names.
+ #
++# ignoredbs = < db1 db2 d3 > (no default)
++# which databases to skip when backing up (applies to sqldump
++# and hotcopy).
++#
+ # nodata = < db.table1 db.table2 db.table3 > (no default)
+ # only dump the structure for the database tables listed here, this means
+ # no data contained in these tables will be dumped. This is very useful
+-- 
+2.0.1
+
